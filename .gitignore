@@ -1,0 +1,13 @@
+# 저작권 방어선 — 모의고사 PDF와 추출된 지문 텍스트는 절대 커밋하지 않는다.
+# 이 레포는 public이고, 해설지에 "무단전재 및 재배포 금지"(EBSi)가 명시돼 있다.
+data/
+*.pdf
+
+# 비밀값
+.env
+.env.local
+
+# 의존성 / 빌드 산물
+node_modules/
+npm-debug.log*
+.DS_Store

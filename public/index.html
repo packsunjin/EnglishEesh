@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>영어 해석 코치</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%93%98%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app" hidden>
+
+  <!-- ── 로그인 ───────────────────────────────────────── -->
+  <section id="view-login" class="view">
+    <div class="card centered">
+      <h1>영어 해석 코치</h1>
+      <p class="muted">2026년 9월 학력평가 영어 18~40번</p>
+      <form id="login-form">
+        <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password">
+        <button type="submit">들어가기</button>
+      </form>
+      <p id="login-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- ── 자료 올리기 ───────────────────────────────────── -->
+  <section id="view-setup" class="view">
+    <div class="card">
+      <h1>자료 올리기</h1>
+      <p>문제지와 해설지 PDF를 올려라. <strong>한 번만</strong> 하면 된다.</p>
+      <p class="muted small">
+        두 파일을 한꺼번에 골라도 되고 순서는 상관없다. 내용을 보고 알아서 가린다.<br>
+        PDF는 <strong>이 기기 안에서만</strong> 처리된다. 서버로 올라가지 않는다.
+      </p>
+      <input type="file" id="pdf-input" accept="application/pdf" multiple>
+      <p id="setup-status" class="muted" role="status"></p>
+      <p id="setup-error" class="error" hidden></p>
+    </div>
+
+    <div class="card" id="setup-review" hidden>
+      <h2>추출 결과 확인</h2>
+      <p class="muted small">시험지와 대조해서 이상한 게 없는지 한 번 훑어봐라.</p>
+      <div id="setup-table"></div>
+      <div id="setup-warnings"></div>
+      <div class="row">
+        <button id="setup-confirm" class="primary">이대로 시작</button>
+        <button id="setup-redo" class="ghost">다시 올리기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 메인 ─────────────────────────────────────────── -->
+  <section id="view-main" class="view">
+    <header>
+      <h1>18~40번</h1>
+      <div class="header-actions">
+        <span id="mode-badge" class="badge"></span>
+        <button id="btn-stats" class="ghost small">통계</button>
+        <button id="btn-menu" class="ghost small">⋯</button>
+      </div>
+    </header>
+
+    <nav id="board" aria-label="문항 진행판"></nav>
+
+    <main id="workspace" hidden>
+      <div class="qhead">
+        <h2 id="q-title"></h2>
+        <button id="btn-source" class="ghost small">원문 보기</button>
+      </div>
+      <div id="q-source" class="source" hidden></div>
+
+      <label for="translation">내 해석</label>
+      <textarea id="translation" rows="7"
+        placeholder="지문을 한국어로 해석해서 여기 써라. 원문은 가려져 있다 — 보고 싶으면 위의 '원문 보기'."></textarea>
+
+      <div class="answer-row">
+        <span>내 답</span>
+        <div id="answer-choices" class="choices"></div>
+        <button id="btn-clear-answer" class="ghost small">지움</button>
+      </div>
+
+      <div class="row">
+        <button id="btn-grade" class="primary"></button>
+        <button id="btn-cmd-word" class="ghost">단어</button>
+        <button id="btn-cmd-whole" class="ghost">통째로</button>
+      </div>
+
+      <div id="copy-flow" hidden>
+        <p class="muted small" id="copy-hint"></p>
+        <label for="paste">Claude가 준 결과를 여기 붙여넣기</label>
+        <textarea id="paste" rows="8" placeholder="[결과] …"></textarea>
+        <div class="row">
+          <button id="btn-accept" class="primary">이 결과 기록</button>
+          <button id="btn-copy-again" class="ghost">다시 복사</button>
+        </div>
+      </div>
+
+      <div id="verdict"></div>
+      <div id="panel"></div>
+    </main>
+  </section>
+
+  <!-- ── 통계 ─────────────────────────────────────────── -->
+  <section id="view-stats" class="view">
+    <header>
+      <h1>정리</h1>
+      <button id="btn-stats-back" class="ghost small">돌아가기</button>
+    </header>
+    <div id="stats-body"></div>
+  </section>
+
+  <!-- ── 메뉴 ─────────────────────────────────────────── -->
+  <section id="view-menu" class="view">
+    <header>
+      <h1>설정</h1>
+      <button id="btn-menu-back" class="ghost small">돌아가기</button>
+    </header>
+    <div class="card">
+      <h2>기록 옮기기</h2>
+      <p class="muted small">
+        기록은 이 기기의 브라우저에만 저장된다. 폰과 PC를 같이 쓰려면 내보내서 옮겨야 한다.
+      </p>
+      <div class="row">
+        <button id="btn-export" class="ghost">내보내기</button>
+        <label class="ghost button-like" for="import-input">불러오기</label>
+        <input type="file" id="import-input" accept="application/json" hidden>
+      </div>
+      <p id="menu-status" class="muted" role="status"></p>
+    </div>
+    <div class="card">
+      <h2>자료 다시 올리기</h2>
+      <p class="muted small">PDF를 다시 읽는다. 채점 기록은 지워지지 않는다.</p>
+      <button id="btn-reset-bank" class="ghost">PDF 다시 올리기</button>
+    </div>
+    <div class="card danger-zone">
+      <h2>기록 지우기</h2>
+      <p class="muted small">채점 기록과 통계가 전부 지워진다. 되돌릴 수 없다.</p>
+      <button id="btn-clear" class="danger">전부 지우기</button>
+    </div>
+  </section>
+
+</div>
+
+<div id="boot" class="card centered">불러오는 중…</div>
+
+<script src="app.js" type="module"></script>
+</body>
+</html>

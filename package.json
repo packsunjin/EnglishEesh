@@ -1,0 +1,19 @@
+{
+  "name": "englisheesh",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "2026 9월 고1 학력평가 영어 18~40번 해석 코치",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "test": "node --test test/*.test.js",
+    "check-bank": "node scripts/check-bank.mjs",
+    "smoke": "node --env-file-if-exists=.env scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "express": "^4.21.2",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "engines": { "node": ">=20" }
+}
