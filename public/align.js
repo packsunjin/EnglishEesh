@@ -44,10 +44,12 @@ function alignByLength(en, ko) {
     const k = sum(lk, j, b);
     const expected = e * ratio;
     const spread = Math.max(expected, 20);
-    return Math.abs(k - expected) / spread + (a + b - 2) * 0.45;
+    return Math.abs(k - expected) / spread + (a + b - 2) * 0.3;
   };
 
-  const MOVES = [[1, 1], [1, 2], [2, 1], [1, 0], [0, 1], [2, 2]];
+  // 해설지는 영어 한 문장을 한국어 세 문장으로 쪼개기도 한다(긴 관계절 문장).
+  // 1:2까지만 허용하면 그 지점부터 짝이 한 칸씩 밀린다.
+  const MOVES = [[1, 1], [1, 2], [2, 1], [1, 3], [3, 1], [2, 2], [1, 0], [0, 1]];
   const INF = Infinity;
   const dp = Array.from({ length: en.length + 1 }, () => new Array(ko.length + 1).fill(INF));
   const back = Array.from({ length: en.length + 1 }, () => new Array(ko.length + 1).fill(null));
@@ -70,6 +72,8 @@ function alignByLength(en, ko) {
     }
   }
 
+  if (!Number.isFinite(dp[en.length][ko.length])) return null;
+
   const pairs = [];
   let i = en.length, j = ko.length;
   while (i > 0 || j > 0) {
@@ -82,6 +86,11 @@ function alignByLength(en, ko) {
     });
     i = pi; j = pj;
   }
+
+  // 짝이 어긋난 채로 보여주면 잘못된 대응을 외우게 된다.
+  // 평균 벌점이 크면 짝짓기를 포기하고 전문 대조로 넘긴다.
+  const avg = dp[en.length][ko.length] / pairs.length;
+  if (avg > 0.8) return null;
   return pairs;
 }
 

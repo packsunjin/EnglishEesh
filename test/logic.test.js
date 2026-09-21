@@ -277,3 +277,27 @@ test('align: 삽입 문항은 주어진 문장을 따로 떼어낸다', () => {
 test('align: 한쪽이 비면 전문 대조로 넘긴다', () => {
   assert.equal(align('Cats sleep.', '').mode, '전문');
 });
+
+test('align: 영어 한 문장이 한국어 세 문장으로 쪼개져도 따라간다', () => {
+  // 실제 해설지가 긴 관계절 문장을 이렇게 쪼갠다. 1:2까지만 허용하면
+  // 여기서부터 짝이 한 칸씩 밀린다.
+  const r = align(
+    'Cats sleep. Even when a cat naps all day, there is still the door, yes, but there is also '
+    + 'the person behind the door who will have shaped the cat for the years after that. Dogs run.',
+    '고양이는 잔다. 고양이가 하루 종일 낮잠을 자도, 문이 있었다. 그렇다. '
+    + '하지만 그 문 뒤에는 이후 몇 년 동안 그 고양이를 만들어 온 사람도 있었다. 개는 뛴다.',
+  );
+  assert.equal(r.mode, '짝');
+  assert.equal(r.pairs.length, 3, '영어 문장 수만큼 짝이 나와야 한다');
+  assert.match(r.pairs[0].ko, /^고양이는 잔다/);
+  assert.match(r.pairs[1].ko, /그렇다/);
+  assert.match(r.pairs[1].ko, /사람도 있었다/, '쪼개진 세 문장이 한 짝으로 묶여야 한다');
+  assert.equal(r.pairs[2].ko, '개는 뛴다.');
+});
+
+test('align: 짝이 도저히 안 맞으면 전문 대조로 넘긴다', () => {
+  // 영어 여덟 문장에 대응하는 한국어가 한 문장뿐이라 길이가 전혀 비례하지 않는다.
+  const en = Array.from({ length: 8 }, (_, i) => `The cat number ${i} sleeps on the warm windowsill.`).join(' ');
+  const r = align(en, '고양이가 잔다.');
+  assert.equal(r.mode, '전문', '어긋난 짝을 보여주느니 전문 대조가 낫다');
+});
