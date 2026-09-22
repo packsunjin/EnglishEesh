@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>학습지 단어 시험</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app" hidden>
+
+  <!-- ── 로그인 ───────────────────────────────────────── -->
+  <section id="view-login" class="view">
+    <div class="card centered">
+      <h1>학습지 단어 시험</h1>
+      <p class="muted">로그인은 해석 코치와 같다.</p>
+      <form id="login-form">
+        <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password">
+        <button type="submit">들어가기</button>
+      </form>
+      <p id="login-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- ── 학습지 목록 ───────────────────────────────────── -->
+  <section id="view-list" class="view">
+    <header>
+      <h1>학습지 단어 시험</h1>
+      <div class="header-actions">
+        <a href="index.html" class="ghost small button-like">해석 코치</a>
+        <button id="btn-new-bank" class="primary small">학습지 올리기</button>
+      </div>
+    </header>
+    <p class="muted small">
+      단어·뜻이 줄줄이 있는 학습지를 올리면 클래스카드처럼 4지선다 문제를 즉석에서 만든다.
+      한 회에 최대 50문제, 항목이 그보다 적으면 있는 만큼 나온다. 전부 이 기기 안에서만 처리된다.
+    </p>
+    <div id="bank-list"></div>
+  </section>
+
+  <!-- ── 학습지 올리기 ─────────────────────────────────── -->
+  <section id="view-upload" class="view">
+    <header>
+      <h1>학습지 올리기</h1>
+      <button id="btn-upload-back" class="ghost small">돌아가기</button>
+    </header>
+    <div class="card">
+      <p class="muted small">
+        한 줄에 단어 하나. <code>apple 사과</code>, <code>apple - 사과</code>,
+        <code>apple: 사과</code>, 탭으로 구분된 줄 다 알아본다. 번호나 <code>-</code>·<code>•</code>
+        같은 기호로 시작해도 된다.
+      </p>
+      <label for="bank-name">학습지 이름</label>
+      <input type="text" id="bank-name" placeholder="예: 3월 모의고사 단어">
+      <label for="bank-text">여기에 붙여넣기</label>
+      <textarea id="bank-text" rows="12" placeholder="apple 사과&#10;banana 바나나&#10;..."></textarea>
+      <p class="muted small">또는 텍스트/PDF 파일로 올리기</p>
+      <input type="file" id="bank-file" accept=".txt,text/plain,application/pdf">
+      <div class="row">
+        <button id="btn-parse" class="primary">문제 만들기 전에 확인</button>
+      </div>
+      <p id="upload-status" class="muted" role="status"></p>
+      <p id="upload-error" class="error" hidden></p>
+    </div>
+
+    <div class="card" id="upload-review" hidden>
+      <h2>읽은 항목 확인</h2>
+      <div id="upload-table"></div>
+      <div id="upload-warnings"></div>
+      <div class="row">
+        <button id="btn-save-bank" class="primary">이 학습지 저장</button>
+        <button id="btn-redo-bank" class="ghost">다시 붙여넣기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 시험 설정 ─────────────────────────────────────── -->
+  <section id="view-setup" class="view">
+    <header>
+      <h1 id="setup-title">시험 설정</h1>
+      <button id="btn-setup-back" class="ghost small">돌아가기</button>
+    </header>
+    <div class="card">
+      <label for="setup-direction">문제 방향</label>
+      <select id="setup-direction">
+        <option value="term-to-meaning">단어를 보여주고 뜻 고르기</option>
+        <option value="meaning-to-term">뜻을 보여주고 단어 고르기</option>
+        <option value="mixed">섞어서</option>
+      </select>
+      <label for="setup-size">문항 수 (최대 50, 학습지에 있는 만큼)</label>
+      <input type="number" id="setup-size" min="2" max="50" value="50">
+      <p id="setup-hint" class="muted small"></p>
+      <div class="row">
+        <button id="btn-start-round" class="primary">시험 시작</button>
+      </div>
+    </div>
+    <div class="card" id="setup-history" hidden>
+      <h3>지난 기록</h3>
+      <div id="history-body"></div>
+    </div>
+  </section>
+
+  <!-- ── 시험 보기 ─────────────────────────────────────── -->
+  <section id="view-test" class="view">
+    <header>
+      <h1 id="test-progress"></h1>
+      <button id="btn-test-quit" class="ghost small">그만두기</button>
+    </header>
+    <nav id="test-board" aria-label="문항 진행판"></nav>
+    <main class="card">
+      <p class="muted small" id="test-direction-label"></p>
+      <h2 id="test-prompt"></h2>
+      <div id="test-choices" class="quiz-choices"></div>
+      <div class="row">
+        <button id="btn-test-prev" class="ghost">이전</button>
+        <button id="btn-test-next" class="ghost">다음</button>
+        <button id="btn-test-submit" class="primary">제출</button>
+      </div>
+    </main>
+  </section>
+
+  <!-- ── 결과 ─────────────────────────────────────────── -->
+  <section id="view-result" class="view">
+    <header>
+      <h1>결과</h1>
+      <button id="btn-result-back" class="ghost small">학습지로</button>
+    </header>
+    <div id="result-body"></div>
+  </section>
+
+</div>
+
+<div id="boot" class="card centered">불러오는 중…</div>
+
+<script src="quizApp.js" type="module"></script>
+</body>
+</html>
