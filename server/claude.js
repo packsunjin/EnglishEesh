@@ -6,6 +6,8 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { buildUserTurn } from '../public/compose.js';
+import { buildQuizUserTurn, QUIZ_TOOL } from '../public/quizCompose.js';
+import { normalizeQuestions } from '../public/quizAI.js';
 
 const MODEL = 'claude-opus-5';
 
@@ -47,4 +49,30 @@ export async function grade(rules, q, input, history = []) {
     .trim();
 
   return { text, usage: res.usage };
+}
+
+/**
+ * 학습지 원문으로 4지선다 문제를 만든다. 텍스트 파싱이 아니라 tool use(JSON)로 받는다 —
+ * 복사 모드가 없는 기능이라 사람이 읽을 포맷을 맞출 이유가 없고, 파싱 실패 위험도 없앤다.
+ * @param {string} rules   prompts/quiz.md
+ * @param {object} p       { name, sourceText, count }
+ * @returns {{questions: object[], usage: object}}
+ */
+export async function generateQuiz(rules, { name, sourceText, count }) {
+  const res = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: Math.min(4000 + count * 300, 32000),
+    output_config: { effort: 'high' },
+    system: [
+      { type: 'text', text: rules, cache_control: { type: 'ephemeral', ttl: '1h' } },
+    ],
+    tools: [QUIZ_TOOL],
+    tool_choice: { type: 'tool', name: QUIZ_TOOL.name },
+    messages: [{ role: 'user', content: buildQuizUserTurn({ name, sourceText, count }) }],
+  });
+
+  const call = res.content.find((b) => b.type === 'tool_use' && b.name === QUIZ_TOOL.name);
+  const questions = normalizeQuestions(call?.input?.questions);
+
+  return { questions, usage: res.usage };
 }

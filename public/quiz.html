@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>학습지 단어 시험</title>
+<title>학습지 문제 생성</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -13,7 +13,7 @@
   <!-- ── 로그인 ───────────────────────────────────────── -->
   <section id="view-login" class="view">
     <div class="card centered">
-      <h1>학습지 단어 시험</h1>
+      <h1>학습지 문제 생성</h1>
       <p class="muted">로그인은 해석 코치와 같다.</p>
       <form id="login-form">
         <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password">
@@ -26,15 +26,20 @@
   <!-- ── 학습지 목록 ───────────────────────────────────── -->
   <section id="view-list" class="view">
     <header>
-      <h1>학습지 단어 시험</h1>
+      <h1>학습지 문제 생성</h1>
       <div class="header-actions">
         <a href="index.html" class="ghost small button-like">해석 코치</a>
         <button id="btn-new-bank" class="primary small">학습지 올리기</button>
       </div>
     </header>
     <p class="muted small">
-      단어·뜻이 줄줄이 있는 학습지를 올리면 클래스카드처럼 4지선다 문제를 즉석에서 만든다.
-      한 회에 최대 50문제, 항목이 그보다 적으면 있는 만큼 나온다. 전부 이 기기 안에서만 처리된다.
+      학습지를 올리면 <strong>Claude가 그 내용을 읽고</strong> 4지선다 문제를 직접 만든다.
+      과목·형식은 가리지 않는다 — 단어장이든 지문이든 개념 정리든 올리는 대로 맞춰 만든다.
+      한 회에 최대 50문제. 이 기능은 서버에 <code>ANTHROPIC_API_KEY</code>가 있어야 동작한다.
+    </p>
+    <p id="list-no-key" class="warn" hidden>
+      API 키가 없다. 이 기능은 자동 모드 전용이라 <code>ANTHROPIC_API_KEY</code> 없이는 문제를
+      만들 수 없다. <code>.env</code>에 키를 넣고 서버를 다시 켜라.
     </p>
     <div id="bank-list"></div>
   </section>
@@ -46,54 +51,52 @@
       <button id="btn-upload-back" class="ghost small">돌아가기</button>
     </header>
     <div class="card">
-      <p class="muted small">
-        한 줄에 단어 하나. <code>apple 사과</code>, <code>apple - 사과</code>,
-        <code>apple: 사과</code>, 탭으로 구분된 줄 다 알아본다. 번호나 <code>-</code>·<code>•</code>
-        같은 기호로 시작해도 된다.
-      </p>
       <label for="bank-name">학습지 이름</label>
-      <input type="text" id="bank-name" placeholder="예: 3월 모의고사 단어">
-      <label for="bank-text">여기에 붙여넣기</label>
-      <textarea id="bank-text" rows="12" placeholder="apple 사과&#10;banana 바나나&#10;..."></textarea>
+      <input type="text" id="bank-name" placeholder="예: 3단원 개념 정리">
+      <label for="bank-text">여기에 붙여넣기 — 형식은 상관없다, 있는 그대로</label>
+      <textarea id="bank-text" rows="14" placeholder="학습지 내용을 그대로 붙여넣어라."></textarea>
       <p class="muted small">또는 텍스트/PDF 파일로 올리기</p>
       <input type="file" id="bank-file" accept=".txt,text/plain,application/pdf">
+      <label for="gen-count">문항 수 (최대 50 — 분량이 적으면 AI가 알아서 더 적게 낸다)</label>
+      <input type="number" id="gen-count" min="1" max="50" value="50">
       <div class="row">
-        <button id="btn-parse" class="primary">문제 만들기 전에 확인</button>
+        <button id="btn-generate" class="primary">AI로 문제 만들기</button>
       </div>
       <p id="upload-status" class="muted" role="status"></p>
       <p id="upload-error" class="error" hidden></p>
     </div>
 
     <div class="card" id="upload-review" hidden>
-      <h2>읽은 항목 확인</h2>
-      <div id="upload-table"></div>
-      <div id="upload-warnings"></div>
+      <h2>생성된 문제 확인</h2>
+      <div id="upload-preview"></div>
       <div class="row">
-        <button id="btn-save-bank" class="primary">이 학습지 저장</button>
-        <button id="btn-redo-bank" class="ghost">다시 붙여넣기</button>
+        <button id="btn-save-bank" class="primary">이대로 저장</button>
+        <button id="btn-redo-bank" class="ghost">다시 만들기</button>
       </div>
     </div>
   </section>
 
-  <!-- ── 시험 설정 ─────────────────────────────────────── -->
+  <!-- ── 학습지 상세 / 시험 시작 ────────────────────────── -->
   <section id="view-setup" class="view">
     <header>
-      <h1 id="setup-title">시험 설정</h1>
+      <h1 id="setup-title">학습지</h1>
       <button id="btn-setup-back" class="ghost small">돌아가기</button>
     </header>
     <div class="card">
-      <label for="setup-direction">문제 방향</label>
-      <select id="setup-direction">
-        <option value="term-to-meaning">단어를 보여주고 뜻 고르기</option>
-        <option value="meaning-to-term">뜻을 보여주고 단어 고르기</option>
-        <option value="mixed">섞어서</option>
-      </select>
-      <label for="setup-size">문항 수 (최대 50, 학습지에 있는 만큼)</label>
-      <input type="number" id="setup-size" min="2" max="50" value="50">
       <p id="setup-hint" class="muted small"></p>
       <div class="row">
         <button id="btn-start-round" class="primary">시험 시작</button>
       </div>
+    </div>
+    <div class="card">
+      <h3>새로 생성</h3>
+      <p class="muted small">같은 학습지로 문제를 다시 만든다. API를 다시 부르므로 비용이 든다.</p>
+      <label for="setup-regen-count">문항 수</label>
+      <input type="number" id="setup-regen-count" min="1" max="50" value="50">
+      <div class="row">
+        <button id="btn-regenerate" class="ghost">문제 새로 생성</button>
+      </div>
+      <p id="regen-status" class="muted" role="status"></p>
     </div>
     <div class="card" id="setup-history" hidden>
       <h3>지난 기록</h3>
@@ -109,7 +112,6 @@
     </header>
     <nav id="test-board" aria-label="문항 진행판"></nav>
     <main class="card">
-      <p class="muted small" id="test-direction-label"></p>
       <h2 id="test-prompt"></h2>
       <div id="test-choices" class="quiz-choices"></div>
       <div class="row">

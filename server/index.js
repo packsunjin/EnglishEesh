@@ -9,7 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-import { grade, hasApiKey } from './claude.js';
+import { grade, generateQuiz, hasApiKey } from './claude.js';
 import { CATEGORIES } from '../public/compose.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +25,8 @@ const rules = [
   await fs.readFile(path.join(root, 'prompts/coach.md'), 'utf8'),
   await fs.readFile(path.join(root, 'prompts/adapter.md'), 'utf8'),
 ].join('\n\n');
+
+const quizRules = await fs.readFile(path.join(root, 'prompts/quiz.md'), 'utf8');
 
 const PASSWORD = process.env.APP_PASSWORD || '';
 const sessions = new Set();
@@ -86,6 +88,27 @@ app.post('/api/grade', requireAuth, async (req, res) => {
     res.json({ text });
   } catch (err) {
     console.error('[채점 실패]', err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.post('/api/quiz-generate', requireAuth, async (req, res) => {
+  if (!hasApiKey()) return res.status(400).json({ error: 'API 키가 없다. 이 기능은 자동 모드 전용이다.' });
+
+  const { name, sourceText, count } = req.body ?? {};
+  if (!sourceText?.trim()) return res.status(400).json({ error: '학습지 내용이 비었다.' });
+  const n = Math.max(1, Math.min(50, Number(count) || 50));
+
+  try {
+    const { questions, usage } = await generateQuiz(quizRules, { name, sourceText: sourceText.trim(), count: n });
+    console.log(
+      `[문제 생성] "${name}" 요청=${n} 생성=${questions.length} in=${usage.input_tokens} `
+      + `cache_write=${usage.cache_creation_input_tokens ?? 0} cache_read=${usage.cache_read_input_tokens ?? 0} `
+      + `out=${usage.output_tokens}`,
+    );
+    res.json({ questions });
+  } catch (err) {
+    console.error('[문제 생성 실패]', err.message);
     res.status(502).json({ error: err.message });
   }
 });

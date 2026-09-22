@@ -1,29 +1,26 @@
-// 학습지 단어 시험 — 화면 상태와 흐름.
+// 학습지 문제 생성 — 화면 상태와 흐름.
 // 해석 코치(app.js)와 로그인 세션을 공유하지만(같은 쿠키), 자료와 로직은 완전히 별개다.
+//
+// 문제는 기계적으로 만들지 않는다. 학습지 원문을 서버(Claude API)에 보내서 실제로 생성한다 —
+// 그래서 이 기능은 자동 모드 전용이다(API 키가 없으면 막힌다). 해석 코치처럼 API 키 없이
+// 쓰는 복사 모드는 만들지 않았다.
 
 import * as pdfjs from './vendor/pdf.min.mjs';
 import { documentToPages } from './pdftext.js';
-import { parseItems } from './quizParse.js';
-import { buildRound, scoreRound } from './quizGen.js';
 import * as db from './quizDb.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = './vendor/pdf.worker.min.mjs';
 
 const $ = (id) => document.getElementById(id);
-const DIRECTION_LABEL = {
-  'term-to-meaning': '단어 → 뜻',
-  'meaning-to-term': '뜻 → 단어',
-  mixed: '섞어서',
-};
 
 const state = {
+  mode: 'copy',
   banks: [],
-  parsed: null,       // 업로드 중 미리보기 { items, skipped, name }
+  pending: null,        // 저장 전 미리보기 { name, sourceText, questions }
   currentBank: null,
-  round: null,         // 현재 시험 문제 배열
-  answers: [],          // 문항별 고른 선지 인덱스, -1 = 안 고름
-  no: 0,                // 현재 보고 있는 문항 인덱스
-  direction: 'term-to-meaning',   // 이번 회차에서 고른 방향 (기록용)
+  round: null,           // 현재 시험 문제 배열
+  answers: [],           // 문항별 고른 선지 인덱스, -1 = 안 고름
+  no: 0,
 };
 
 function show(view) {
@@ -45,8 +42,9 @@ async function boot() {
   try {
     status = await fetch('/api/status').then((r) => r.json());
   } catch {
-    status = { needsPassword: false, authed: true };
+    status = { needsPassword: false, authed: true, mode: 'copy' };
   }
+  state.mode = status.mode;
   $('boot').hidden = true;
   $('app').hidden = false;
   if (status.needsPassword && !status.authed) { show('login'); return; }
@@ -63,6 +61,8 @@ $('login-form').addEventListener('submit', async (e) => {
     body: JSON.stringify({ password: $('password').value }),
   });
   if (!res.ok) { err.hidden = false; text(err, '비밀번호가 틀렸다.'); return; }
+  const status = await res.json();
+  state.mode = status.mode;
   await enterApp();
 });
 
@@ -74,6 +74,9 @@ async function enterApp() {
 
 // ── 학습지 목록 ────────────────────────────────────────
 function renderBankList() {
+  $('list-no-key').hidden = state.mode === 'auto';
+  $('btn-new-bank').disabled = state.mode !== 'auto';
+
   const box = $('bank-list');
   if (!state.banks.length) {
     box.innerHTML = '<div class="card"><p class="muted">아직 올린 학습지가 없다. 위 버튼으로 하나 올려라.</p></div>';
@@ -84,7 +87,7 @@ function renderBankList() {
     .map((b) => `
       <div class="card bank-card">
         <h3>${esc(b.name)}</h3>
-        <p class="muted small">${b.items.length}개 항목 · ${new Date(b.createdAt).toLocaleDateString()}</p>
+        <p class="muted small">${b.questions?.length ?? 0}문제 · ${new Date(b.createdAt).toLocaleDateString()}</p>
         <div class="row">
           <button class="primary small" data-act="test" data-id="${b.id}">시험 보기</button>
           <button class="ghost small" data-act="delete" data-id="${b.id}">삭제</button>
@@ -109,11 +112,14 @@ async function removeBank(id) {
 
 // ── 학습지 올리기 ──────────────────────────────────────
 $('btn-new-bank').onclick = () => {
+  if (state.mode !== 'auto') return;
   $('bank-name').value = '';
   $('bank-text').value = '';
   $('bank-file').value = '';
+  $('gen-count').value = '50';
   $('upload-review').hidden = true;
   $('upload-error').hidden = true;
+  state.pending = null;
   text($('upload-status'), '');
   show('upload');
 };
@@ -132,7 +138,7 @@ $('bank-file').addEventListener('change', async (e) => {
       : await file.text();
     $('bank-text').value = content;
     if (!$('bank-name').value.trim()) $('bank-name').value = file.name.replace(/\.[^.]+$/, '');
-    text(status, '읽었다. 아래에서 확인해라.');
+    text(status, '읽었다.');
   } catch (ex) {
     text(status, '');
     err.hidden = false;
@@ -147,70 +153,89 @@ async function pdfToText(file) {
   return pages.map((p) => p.lines.map((l) => l.text).join('\n')).join('\n');
 }
 
-$('btn-parse').onclick = () => {
+/** 서버(Claude API)에 문제 생성을 요청한다. */
+async function requestQuiz(name, sourceText, count) {
+  const res = await fetch('/api/quiz-generate', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, sourceText, count }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `서버 오류 ${res.status}`);
+  return data.questions;
+}
+
+$('btn-generate').onclick = async () => {
   const err = $('upload-error');
   err.hidden = true;
-  const raw = $('bank-text').value;
-  if (!raw.trim()) { err.hidden = false; text(err, '학습지 내용을 붙여넣거나 파일을 올려라.'); return; }
+  const name = $('bank-name').value.trim() || `학습지 ${new Date().toLocaleDateString()}`;
+  const sourceText = $('bank-text').value.trim();
+  const count = Math.max(1, Math.min(50, Number($('gen-count').value) || 50));
 
-  const { items, skipped } = parseItems(raw);
-  if (!items.length) {
+  if (!sourceText) { err.hidden = false; text(err, '학습지 내용을 붙여넣거나 파일을 올려라.'); return; }
+
+  const btn = $('btn-generate');
+  btn.disabled = true;
+  btn.textContent = '만드는 중… (자료가 길면 시간이 좀 걸린다)';
+  text($('upload-status'), '');
+  try {
+    const questions = await requestQuiz(name, sourceText, count);
+    state.pending = { name, sourceText, questions };
+    reviewGenerated(questions);
+  } catch (ex) {
     err.hidden = false;
-    text(err, '한 줄도 읽지 못했다. "단어 뜻" 형식인지 확인해라.');
-    $('upload-review').hidden = true;
-    return;
+    text(err, `문제를 만들지 못했다: ${ex.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'AI로 문제 만들기';
   }
-  state.parsed = { items, skipped };
-  reviewParsed(items, skipped);
 };
 
-function reviewParsed(items, skipped) {
-  const rows = items.map((it) => `<tr><td>${esc(it.term)}</td><td>${esc(it.meaning)}</td></tr>`).join('');
-  $('upload-table').innerHTML =
-    `<p class="ok-note">${items.length}개 항목을 읽었다.</p>
-     <table><thead><tr><th>단어</th><th>뜻</th></tr></thead><tbody>${rows}</tbody></table>`;
-
-  $('upload-warnings').innerHTML = skipped.length
-    ? `<div class="warn"><strong>못 읽은 줄 ${skipped.length}개</strong><ul>
-        ${skipped.slice(0, 20).map((s) => `<li>${esc(s)}</li>`).join('')}
-        ${skipped.length > 20 ? `<li>… 외 ${skipped.length - 20}줄</li>` : ''}
-       </ul></div>`
-    : '';
-
+function reviewGenerated(questions) {
+  $('upload-preview').innerHTML = `
+    <p class="ok-note">${questions.length}문제를 만들었다.</p>
+    ${questions.map((q, i) => `
+      <div class="qpreview">
+        <p><b>${i + 1}.</b> ${esc(q.question)}</p>
+        <ol class="qpreview-choices">
+          ${q.choices.map((c, j) => `<li class="${j === q.correctIndex ? 'correct' : ''}">${esc(c)}</li>`).join('')}
+        </ol>
+        <p class="muted small">${esc(q.explanation)}</p>
+      </div>`).join('')}
+  `;
   $('upload-review').hidden = false;
   $('upload-review').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-$('btn-redo-bank').onclick = () => { $('upload-review').hidden = true; };
+$('btn-redo-bank').onclick = () => { $('upload-review').hidden = true; state.pending = null; };
 
 $('btn-save-bank').onclick = async () => {
-  if (!state.parsed) return;
-  const name = $('bank-name').value.trim() || `학습지 ${new Date().toLocaleDateString()}`;
-  const id = await db.addBank(name, state.parsed.items);
-  state.parsed = null;
+  if (!state.pending) return;
+  const { name, sourceText, questions } = state.pending;
+  const id = await db.addBank(name, sourceText, questions);
+  state.pending = null;
   state.banks = await db.listBanks();
   renderBankList();
   openSetup(id);
 };
 
-// ── 시험 설정 ─────────────────────────────────────────
+// ── 학습지 상세 / 시험 시작 ─────────────────────────────
 async function openSetup(bankId) {
   const bank = await db.getBank(bankId);
   if (!bank) return;
   state.currentBank = bank;
   text($('setup-title'), bank.name);
-  const max = Math.min(50, bank.items.length);
-  $('setup-size').max = String(max);
-  $('setup-size').value = String(max);
-  text($('setup-hint'), `이 학습지에는 ${bank.items.length}개 항목이 있다. 한 회 최대 ${max}문제.`);
+  text($('setup-hint'), `이 학습지에는 문제 ${bank.questions?.length ?? 0}개가 저장돼 있다.`);
+  $('setup-regen-count').value = String(Math.min(50, bank.questions?.length || 50));
+  text($('regen-status'), '');
+  $('btn-regenerate').disabled = state.mode !== 'auto';
 
   const attempts = (await db.listAttempts(bankId)).sort((a, b) => b.ts - a.ts);
   $('setup-history').hidden = attempts.length === 0;
   if (attempts.length) {
-    $('history-body').innerHTML = `<table><thead><tr><th>날짜</th><th>방향</th><th>점수</th></tr></thead><tbody>${
+    $('history-body').innerHTML = `<table><thead><tr><th>날짜</th><th>점수</th></tr></thead><tbody>${
       attempts.slice(0, 10).map((a) => `<tr>
         <td>${new Date(a.ts).toLocaleString()}</td>
-        <td>${DIRECTION_LABEL[a.direction] || a.direction}</td>
         <td>${a.correct} / ${a.total}</td>
       </tr>`).join('')
     }</tbody></table>`;
@@ -222,21 +247,38 @@ $('btn-setup-back').onclick = () => show('list');
 
 $('btn-start-round').onclick = () => {
   const bank = state.currentBank;
-  if (!bank) return;
-  const direction = $('setup-direction').value;
-  const size = Math.max(2, Math.min(50, Number($('setup-size').value) || bank.items.length));
+  if (!bank?.questions?.length) { alert('저장된 문제가 없다.'); return; }
+  startRound(bank.questions);
+};
+
+$('btn-regenerate').onclick = async () => {
+  const bank = state.currentBank;
+  if (!bank || state.mode !== 'auto') return;
+  const count = Math.max(1, Math.min(50, Number($('setup-regen-count').value) || 50));
+  const btn = $('btn-regenerate');
+  btn.disabled = true;
+  btn.textContent = '만드는 중…';
+  text($('regen-status'), '');
   try {
-    startRound(bank.items, direction, size);
+    const questions = await requestQuiz(bank.name, bank.sourceText, count);
+    await db.setQuestions(bank.id, questions);
+    state.currentBank = { ...bank, questions };
+    text($('setup-hint'), `이 학습지에는 문제 ${questions.length}개가 저장돼 있다.`);
+    text($('regen-status'), `${questions.length}문제로 새로 만들었다.`);
+    state.banks = await db.listBanks();
+    renderBankList();
   } catch (ex) {
-    alert(ex.message);
+    text($('regen-status'), `실패: ${ex.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '문제 새로 생성';
   }
 };
 
-function startRound(items, direction, size) {
-  state.round = buildRound(items, { size, direction });
-  state.answers = new Array(state.round.length).fill(-1);
+function startRound(questions) {
+  state.round = questions;
+  state.answers = new Array(questions.length).fill(-1);
   state.no = 0;
-  state.direction = direction;
   renderTestBoard();
   renderQuestion();
   show('test');
@@ -260,8 +302,7 @@ function renderTestBoard() {
 function renderQuestion() {
   const q = state.round[state.no];
   text($('test-progress'), `${state.no + 1} / ${state.round.length}`);
-  text($('test-direction-label'), DIRECTION_LABEL[q.direction] || '');
-  text($('test-prompt'), q.prompt);
+  text($('test-prompt'), q.question);
 
   const box = $('test-choices');
   box.innerHTML = '';
@@ -290,14 +331,15 @@ $('btn-test-next').onclick = () => {
 $('btn-test-submit').onclick = async () => {
   const unanswered = state.answers.filter((a) => a === -1).length;
   if (unanswered && !confirm(`${unanswered}문제를 안 골랐다. 그래도 제출할까?`)) return;
-  const result = scoreRound(state.round, state.answers);
-  await db.addAttempt({
-    bankId: state.currentBank.id,
-    ts: Date.now(),
-    total: result.total,
-    correct: result.correct,
-    direction: state.direction,
+
+  const details = state.round.map((q, i) => {
+    const chosenIndex = state.answers[i];
+    return { ...q, chosenIndex, isCorrect: chosenIndex === q.correctIndex };
   });
+  const correct = details.filter((d) => d.isCorrect).length;
+  const result = { total: details.length, correct, wrong: details.length - correct, details };
+
+  await db.addAttempt({ bankId: state.currentBank.id, ts: Date.now(), total: result.total, correct: result.correct });
   renderResult(result);
   show('result');
 };
@@ -311,11 +353,12 @@ $('btn-test-quit').onclick = () => {
 function renderResult(result) {
   const pct = Math.round((result.correct / result.total) * 100);
   const wrongRows = result.details.filter((d) => !d.isCorrect).map((d) => `
-    <tr>
-      <td>${esc(d.term)}</td>
-      <td>${esc(d.meaning)}</td>
-      <td class="wrong">${d.chosenIndex === -1 ? '(안 고름)' : esc(d.choices[d.chosenIndex])}</td>
-    </tr>`).join('');
+    <div class="qpreview">
+      <p>${esc(d.question)}</p>
+      <p class="error small">내가 고른 것: ${d.chosenIndex === -1 ? '(안 고름)' : esc(d.choices[d.chosenIndex])}</p>
+      <p class="ok-note small">정답: ${esc(d.choices[d.correctIndex])}</p>
+      <p class="muted small">${esc(d.explanation)}</p>
+    </div>`).join('');
 
   $('result-body').innerHTML = `
     <div class="card centered">
@@ -325,8 +368,7 @@ function renderResult(result) {
     ${wrongRows ? `
       <div class="card">
         <h3>틀린 것 ${result.wrong}개</h3>
-        <table><thead><tr><th>단어</th><th>뜻</th><th>내가 고른 것</th></tr></thead>
-        <tbody>${wrongRows}</tbody></table>
+        ${wrongRows}
       </div>
       <div class="row">
         <button id="btn-retry-wrong" class="primary">틀린 것만 다시</button>
@@ -336,14 +378,9 @@ function renderResult(result) {
   const retryBtn = $('btn-retry-wrong');
   if (retryBtn) {
     retryBtn.onclick = () => {
-      const wrongItems = result.details.filter((d) => !d.isCorrect)
-        .map((d) => ({ term: d.term, meaning: d.meaning }));
-      if (wrongItems.length < 2) { alert('오답이 1개뿐이라 다시 시험을 만들 수 없다.'); return; }
-      try {
-        startRound(wrongItems, state.direction, wrongItems.length);
-      } catch (ex) {
-        alert(ex.message);
-      }
+      const wrongQuestions = result.details.filter((d) => !d.isCorrect)
+        .map(({ question, choices, correctIndex, explanation }) => ({ question, choices, correctIndex, explanation }));
+      startRound(wrongQuestions);
     };
   }
 }

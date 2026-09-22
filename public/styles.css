@@ -158,17 +158,23 @@ input[type="file"] { inline-size: 100%; margin-block: 8px; }
 .cell.current { outline: 2px solid var(--accent); outline-offset: 1px; }
 .cell.answered { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--accent); font-weight: 700; }
 
-/* ── 단어 시험 ───────────────────────────────── */
+/* ── 학습지 문제 생성 ───────────────────────── */
 .bank-card h3 { margin-block-end: 2px; }
 .quiz-choices { display: grid; gap: 8px; margin-block: 14px 4px; }
 .quiz-choice { inline-size: 100%; text-align: start; padding: 13px 14px; line-height: 1.5; }
 .quiz-choice.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 #test-prompt { font-size: 1.15rem; line-height: 1.6; }
-select {
-  inline-size: 100%; font: inherit; padding: 11px 12px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink);
-}
 code { background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+
+.qpreview {
+  border-block-start: 1px solid var(--line);
+  padding-block: 12px;
+}
+.qpreview:first-of-type { border-block-start: none; padding-block-start: 0; }
+.qpreview-choices { margin: 6px 0 8px; padding-inline-start: 22px; }
+.qpreview-choices li { margin-block-end: 3px; }
+.qpreview-choices li.correct { color: var(--right); font-weight: 700; }
+.qpreview .small { margin: 0; }
 
 .qhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-block-start: 18px; }
 

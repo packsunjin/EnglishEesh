@@ -26,6 +26,23 @@ const 응답 = {
   usage: { input_tokens: 1200, output_tokens: 40, cache_creation_input_tokens: 900, cache_read_input_tokens: 0 },
 };
 
+const 문제생성응답 = {
+  id: 'msg_quiz_test', type: 'message', role: 'assistant', model: 'claude-opus-5',
+  content: [{
+    type: 'tool_use', id: 'toolu_test', name: 'submit_quiz',
+    input: {
+      questions: [{
+        question: '광합성이 일어나는 세포 소기관은?',
+        choices: ['엽록체', '미토콘드리아', '리보솜', '핵'],
+        correctIndex: 0,
+        explanation: '학습지의 "광합성은 엽록체에서 일어난다" 문장.',
+      }],
+    },
+  }],
+  stop_reason: 'tool_use', stop_sequence: null,
+  usage: { input_tokens: 800, output_tokens: 120, cache_creation_input_tokens: 500, cache_read_input_tokens: 0 },
+};
+
 /**
  * claude.js는 Anthropic 클라이언트를 모듈 안에 캐시한다(요청마다 새로 만들지 않으려고).
  * 그래서 테스트마다 새 가짜 서버를 띄우려면 모듈 자체를 새로 불러와야 한다.
@@ -34,7 +51,7 @@ const 응답 = {
 let freshCount = 0;
 const freshClaude = () => import(`../server/claude.js?t=${++freshCount}`);
 
-async function captureRequest(fn) {
+async function captureRequest(fn, response = 응답) {
   let captured = null;
   const server = http.createServer((req, res) => {
     let body = '';
@@ -42,7 +59,7 @@ async function captureRequest(fn) {
     req.on('end', () => {
       captured = { path: req.url, headers: req.headers, body: JSON.parse(body) };
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(응답));
+      res.end(JSON.stringify(response));
     });
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -121,4 +138,37 @@ test('grade(): 캐시 프리픽스는 문항이 바뀌어도 그대로다', asyn
   });
   assert.deepEqual(a.captured.body.system, b.captured.body.system,
     'system이 호출마다 달라지면 캐시가 매번 깨진다');
+});
+
+test('generateQuiz(): tool use로 강제하고, 학습지 원문을 그대로 보낸다', async () => {
+  const rules = '# 역할\n너는 출제자다.';
+  const { captured, result } = await captureRequest(async () => {
+    const { generateQuiz } = await freshClaude();
+    return generateQuiz(rules, { name: '3단원', sourceText: '광합성은 엽록체에서 일어난다.', count: 30 });
+  }, 문제생성응답);
+
+  const b = captured.body;
+  assert.equal(b.model, 'claude-opus-5');
+  assert.equal(b.output_config.effort, 'high');
+
+  // Opus 5가 400으로 거절하는 것들
+  assert.equal('budget_tokens' in (b.thinking ?? {}), false);
+  assert.equal(b.temperature, undefined);
+  assert.equal(b.top_p, undefined);
+
+  // 출력은 tool use로 강제한다 — 사람이 읽을 포맷을 파싱하지 않는다
+  assert.equal(b.tools[0].name, 'submit_quiz');
+  assert.deepEqual(b.tool_choice, { type: 'tool', name: 'submit_quiz' });
+
+  // 규칙은 캐시 붙는 system에, 학습지 원문은 messages에
+  assert.equal(b.system[0].text, rules);
+  assert.deepEqual(b.system[0].cache_control, { type: 'ephemeral', ttl: '1h' });
+  assert.match(b.messages[0].content, /<학습지>/);
+  assert.match(b.messages[0].content, /광합성은 엽록체에서 일어난다\./);
+  assert.match(b.messages[0].content, /최대 30개/);
+
+  // tool_use 응답이 정제된 문제 배열로 나온다
+  assert.equal(result.questions.length, 1);
+  assert.equal(result.questions[0].correctIndex, 0);
+  assert.equal(result.usage.input_tokens, 800);
 });
