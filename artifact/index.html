@@ -1,0 +1,465 @@
+<title>해석 코치 18–38</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+:root {
+  --paper:      #faf8f4;
+  --surface:    #ffffff;
+  --sunk:       #f2efe8;
+  --rule:       #e2ddd2;
+  --ink:        #1b1a17;
+  --ink-soft:   #6b665c;
+  --accent:     #2f5d50;
+  --accent-ink: #ffffff;
+
+  --right:   #2f6b45;
+  --partial: #9a6b18;
+  --wrong:   #a8382b;
+
+  --cat-0: #9a6b18;  /* 어휘   */
+  --cat-1: #35558f;  /* 구문   */
+  --cat-2: #2f6b45;  /* 논리   */
+  --cat-3: #6f3f8c;  /* 지시어 */
+  --cat-4: #a8382b;  /* 범위   */
+
+  --read: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --ui: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
+        "Noto Sans KR", "Malgun Gothic", sans-serif;
+
+  --r: 9px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:    #16171b;
+    --surface:  #1e2026;
+    --sunk:     #24272e;
+    --rule:     #343841;
+    --ink:      #ecebe8;
+    --ink-soft: #9a988f;
+    --accent:   #74c0a5;
+    --accent-ink: #10221c;
+    --right:   #6cc38d;
+    --partial: #dfb15a;
+    --wrong:   #ef8272;
+    --cat-0: #dfb15a; --cat-1: #8fabe6; --cat-2: #6cc38d;
+    --cat-3: #c39ce0; --cat-4: #ef8272;
+  }
+}
+:root[data-theme="dark"] {
+  --paper:    #16171b;
+  --surface:  #1e2026;
+  --sunk:     #24272e;
+  --rule:     #343841;
+  --ink:      #ecebe8;
+  --ink-soft: #9a988f;
+  --accent:   #74c0a5;
+  --accent-ink: #10221c;
+  --right:   #6cc38d;
+  --partial: #dfb15a;
+  --wrong:   #ef8272;
+  --cat-0: #dfb15a; --cat-1: #8fabe6; --cat-2: #6cc38d;
+  --cat-3: #c39ce0; --cat-4: #ef8272;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.65 var(--ui);
+  padding-inline: 16px;
+  padding-block: 0 56px;
+  overflow-wrap: break-word;
+}
+.wrap { max-inline-size: 660px; margin-inline: auto; }
+
+h1 { font-size: 1.15rem; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 1rem; margin: 0 0 8px; text-wrap: balance; }
+h3 { font-size: .95rem; margin: 0 0 10px; }
+p  { margin: 0 0 10px; }
+
+.muted { color: var(--ink-soft); }
+.small { font-size: .84rem; line-height: 1.55; }
+.eyebrow {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--ink-soft); font-weight: 600;
+}
+
+/* ── 머리 ────────────────────────────────── */
+header {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
+  background: var(--paper);
+  border-block-end: 1px solid var(--rule);
+  padding-block: 12px 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.header-actions { display: flex; gap: 6px; }
+
+/* ── 버튼 ────────────────────────────────── */
+button {
+  font: inherit; color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 10px 15px; min-block-size: 44px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: default; }
+button.primary {
+  background: var(--accent); color: var(--accent-ink);
+  border-color: var(--accent); font-weight: 600;
+}
+button.ghost { background: transparent; }
+button.tiny { padding: 5px 10px; min-block-size: 34px; font-size: .82rem; }
+button.danger { color: var(--wrong); border-color: color-mix(in srgb, var(--wrong) 45%, var(--rule)); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+textarea {
+  inline-size: 100%; font: inherit; line-height: 1.75;
+  padding: 12px; border: 1px solid var(--rule); border-radius: var(--r);
+  background: var(--surface); color: var(--ink); resize: vertical;
+}
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+label { display: block; margin: 16px 0 6px; }
+
+/* ── 진행판 ──────────────────────────────── */
+#board {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 5px; margin-block: 14px 4px;
+}
+.cell {
+  min-block-size: 44px; padding: 0; border-radius: 7px;
+  font-variant-numeric: tabular-nums; font-size: .92rem;
+  position: relative;
+}
+.cell.right   { color: var(--right);   border-color: var(--right);   background: color-mix(in srgb, var(--right) 12%, var(--surface));   font-weight: 700; }
+.cell.partial { color: var(--partial); border-color: var(--partial); background: color-mix(in srgb, var(--partial) 12%, var(--surface)); font-weight: 700; }
+.cell.wrong   { color: var(--wrong);   border-color: var(--wrong);   background: color-mix(in srgb, var(--wrong) 12%, var(--surface));   font-weight: 700; }
+.cell.current { outline: 2px solid var(--accent); outline-offset: 1px; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: .76rem; color: var(--ink-soft); margin-block-end: 18px; }
+.legend i { font-style: normal; }
+.legend .dot { display: inline-block; inline-size: 8px; block-size: 8px; border-radius: 50%; margin-inline-end: 4px; vertical-align: 1px; }
+
+/* ── 문항 작업 영역 ──────────────────────── */
+.qhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.qtype { font-size: .8rem; color: var(--ink-soft); }
+
+.source {
+  background: var(--sunk); border: 1px solid var(--rule);
+  border-radius: var(--r); padding: 14px; margin-block-start: 10px;
+}
+.source .ask { font-weight: 600; font-size: .9rem; margin-block-end: 8px; }
+.source .passage { font-family: var(--read); font-size: 1.02rem; line-height: 1.8; }
+.source .opts { font-family: var(--read); margin: 10px 0 0; padding-inline-start: 0; list-style: none; }
+.source .opts li { margin-block-end: 2px; }
+
+.answer-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-block-start: 14px; }
+.choice { min-inline-size: 44px; padding: 8px; }
+.choice.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+/* ── 채점 결과 ───────────────────────────── */
+.verdict {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-inline-start: 4px solid var(--ink-soft);
+  border-radius: var(--r); padding: 14px; margin-block-start: 18px;
+}
+.verdict.right   { border-inline-start-color: var(--right); }
+.verdict.partial { border-inline-start-color: var(--partial); }
+.verdict.wrong   { border-inline-start-color: var(--wrong); }
+.vline { display: flex; gap: 10px; align-items: baseline; margin-block-end: 9px; }
+.vline:last-child { margin-block-end: 0; }
+.vkey { flex: 0 0 60px; font-size: .74rem; color: var(--ink-soft); letter-spacing: .03em; }
+.vquote { font-family: var(--read); font-size: .96rem; line-height: 1.7; }
+.vgloss { color: var(--ink-soft); margin-block-start: 2px; }
+.vnext b { color: var(--accent); }
+.verdict pre { white-space: pre-wrap; font: inherit; font-size: .88rem; color: var(--ink-soft); margin: 0; }
+
+.cat {
+  font-size: .75rem; padding: 2px 9px; border-radius: 999px;
+  border: 1px solid currentColor; font-weight: 600; white-space: nowrap;
+}
+.cat-0 { color: var(--cat-0); } .cat-1 { color: var(--cat-1); } .cat-2 { color: var(--cat-2); }
+.cat-3 { color: var(--cat-3); } .cat-4 { color: var(--cat-4); }
+.flag { font-size: .72rem; font-weight: 700; }
+.flag.ok   { color: var(--right); font-weight: 400; }
+.flag.warn { color: var(--wrong); }
+
+.thinking { color: var(--ink-soft); font-size: .9rem; }
+.thinking::after { content: ""; animation: dots 1.4s steps(4, end) infinite; }
+@keyframes dots { 0% { content: ""; } 25% { content: "·"; } 50% { content: "··"; } 75% { content: "···"; } }
+@media (prefers-reduced-motion: reduce) { .thinking::after { content: "···"; animation: none; } }
+
+/* ── 패널 (단어 · 통째로 · 정리) ─────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: var(--r); padding: 16px; margin-block-start: 14px;
+}
+table { inline-size: 100%; border-collapse: collapse; font-size: .88rem; }
+th, td { text-align: start; padding: 7px 8px; border-block-end: 1px solid var(--rule); vertical-align: top; }
+th { font-size: .74rem; color: var(--ink-soft); font-weight: 600; letter-spacing: .04em; }
+.vocab td:first-child { white-space: nowrap; font-family: var(--read); font-weight: 600; }
+.vocab td:last-child { font-family: var(--read); color: var(--ink-soft); }
+
+.pairs { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+.pairs li { margin-block-end: 15px; padding-inline-start: 26px; position: relative; }
+.pairs li::before {
+  counter-increment: s; content: counter(s);
+  position: absolute; inset-inline-start: 0; inset-block-start: 3px;
+  font-size: .7rem; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+}
+.pairs .en { font-family: var(--read); font-size: .98rem; line-height: 1.7; }
+.pairs .ko { color: var(--ink-soft); margin-block-start: 3px; font-size: .92rem; }
+.given { border-inline-start: 3px solid var(--accent); padding-inline-start: 11px; margin-block-end: 16px; }
+.side { display: grid; gap: 16px; }
+.side .en p { font-family: var(--read); }
+
+/* ── 통계 ────────────────────────────────── */
+.tally { display: flex; gap: 16px; flex-wrap: wrap; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tally .r { color: var(--right); } .tally .p { color: var(--partial); } .tally .w { color: var(--wrong); }
+.bar-row { display: flex; align-items: center; gap: 10px; margin-block-end: 7px; }
+.bar-label { flex: 0 0 52px; font-size: .85rem; }
+.bar-track { flex: 1; background: var(--sunk); border-radius: 999px; block-size: 11px; overflow: hidden; }
+.bar { block-size: 100%; border-radius: 999px; background: currentColor; }
+.bar-value { flex: 0 0 22px; text-align: end; font-variant-numeric: tabular-nums; font-size: .85rem; color: var(--ink-soft); }
+.tips { white-space: pre-wrap; font: inherit; font-size: .91rem; margin: 0; line-height: 1.75; }
+
+/* ── 단어장 ──────────────────────────────── */
+.vbar { align-items: center; justify-content: space-between; margin-block: 14px 6px; }
+.vgroup { padding-block: 12px 6px; }
+.vlist { list-style: none; margin: 6px 0 0; padding: 0; }
+.vlist li { display: flex; gap: 8px; align-items: stretch; border-block-start: 1px solid var(--rule); }
+.vlist li:first-child { border-block-start: 0; }
+.vword {
+  flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  background: transparent; border: 0; border-radius: 0; padding: 10px 2px; text-align: start;
+}
+.vword .en { font-family: var(--read); font-size: 1.05rem; font-weight: 600; }
+.vword .ko { font-size: .88rem; color: var(--ink-soft); }
+.vword[aria-expanded="true"] .ko { color: var(--ink); }
+.vcheck {
+  flex: 0 0 44px; align-self: center; padding: 0; min-block-size: 40px;
+  border-radius: 999px; font-size: 1.05rem; color: var(--ink-soft);
+}
+.vlist li.known .vcheck { background: var(--right); border-color: var(--right); color: var(--surface); }
+.vlist li.known .en { color: var(--ink-soft); }
+
+.vtools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-block: 4px 14px; }
+#vocab-range {
+  font: inherit; padding: 8px 10px; min-block-size: 40px;
+  border: 1px solid var(--rule); border-radius: var(--r);
+  background: var(--surface); color: var(--ink);
+}
+.vtabs { display: flex; border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
+.vtab { border: 0; border-radius: 0; min-block-size: 40px; padding: 6px 15px; background: var(--surface); }
+.vtab + .vtab { border-inline-start: 1px solid var(--rule); }
+.vtab.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.vmeter { block-size: 6px; background: var(--sunk); border-radius: 999px; overflow: hidden; }
+.vmeter > div { block-size: 100%; background: var(--accent); transition: inline-size .2s; }
+.vcount { text-align: end; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+
+.fcard {
+  inline-size: 100%; min-block-size: 260px; position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 30px 18px 24px; border-radius: 14px; text-align: center;
+  background: var(--surface); border: 1px solid var(--rule);
+}
+.fcard.small { min-block-size: 150px; }
+.fcard.flipped {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--rule));
+}
+.fnum { position: absolute; inset-block-start: 12px; inset-inline-start: 14px; font-size: .75rem; color: var(--ink-soft); }
+.fword { font-family: var(--read); font-size: clamp(1.9rem, 9vw, 2.6rem); font-weight: 600; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.fhint { font-size: .85rem; color: var(--ink-soft); }
+.fmean { font-size: 1.15rem; font-weight: 600; }
+.fsent { font-family: var(--read); font-size: .95rem; line-height: 1.65; color: var(--ink-soft); max-inline-size: 34em; text-align: start; }
+.fsent mark { background: color-mix(in srgb, var(--partial) 28%, transparent); color: var(--ink); padding: 0 2px; border-radius: 3px; }
+
+.fbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-block-start: 12px; }
+.fbtns button { min-block-size: 56px; font-weight: 600; font-size: 1.02rem; }
+.fbtn-no { color: var(--wrong); border-color: color-mix(in srgb, var(--wrong) 45%, var(--rule)); }
+.fbtn-yes { background: var(--right); color: var(--surface); border-color: var(--right); }
+.kbd-hint { text-align: center; margin-block-start: 10px; }
+@media (hover: none) { .kbd-hint { display: none; } }
+
+.tchoices { display: grid; gap: 8px; margin-block-start: 12px; }
+.tchoice { text-align: start; min-block-size: 52px; display: flex; gap: 10px; align-items: center; }
+.tchoice:disabled { opacity: 1; }
+.tnum { flex: 0 0 22px; font-size: .8rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.tchoice.right { background: color-mix(in srgb, var(--right) 16%, var(--surface)); border-color: var(--right); color: var(--right); font-weight: 600; }
+.tchoice.wrong { background: color-mix(in srgb, var(--wrong) 14%, var(--surface)); border-color: var(--wrong); color: var(--wrong); }
+.tnext { inline-size: 100%; margin-block-start: 12px; min-block-size: 52px; }
+
+/* 단어장이 열려 있으면 페이지는 안 움직이고 한 화면에 맞춘다.
+   (:has로 판단하므로 어느 코드가 단어장을 닫든 잠금이 같이 풀린다) */
+html:has(#vocab-view:not([hidden])),
+html:has(#vocab-view:not([hidden])) body { block-size: 100%; overflow: hidden; }
+html:has(#vocab-view:not([hidden])) body { padding-block: 0; }
+html:has(#vocab-view:not([hidden])) .wrap { block-size: 100%; display: flex; flex-direction: column; }
+html:has(#vocab-view:not([hidden])) header { flex: none; }
+#vocab-view:not([hidden]) {
+  flex: 1; min-block-size: 0;
+  display: flex; flex-direction: column;
+  padding-block: 10px 12px;
+}
+#vocab-view .vtools { flex: none; flex-wrap: nowrap; margin: 0 0 10px; }
+#vocab-view .vtools #vocab-range { flex: 1; min-inline-size: 0; }
+#vocab-view .vtools #btn-vocab-back { flex: none; min-inline-size: 40px; padding-inline: 8px; }
+#vocab-view .vtab { padding-inline: 11px; }
+#vocab-stage { flex: 1; min-block-size: 0; display: flex; flex-direction: column; }
+#vocab-stage > * { flex: none; }
+#vocab-stage.list { display: block; overflow-y: auto; overscroll-behavior: contain; }
+#vocab-stage .vcount { display: flex; justify-content: space-between; gap: 10px; margin: 6px 0 8px; }
+
+/* 카드는 남는 높이를 다 쓴다. 예문이 길면 카드 안에서만 스크롤된다. */
+#vocab-stage > .fcard {
+  flex: 1 1 auto; min-block-size: 0; overflow-y: auto;
+  justify-content: flex-start; cursor: pointer;
+}
+#vocab-stage > .fcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fin { margin-block: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; inline-size: 100%; }
+#vocab-stage > .tchoices { margin-block-start: 10px; }
+#vocab-stage .tchoice { min-block-size: 48px; }
+#vocab-stage > .vdone { margin-block: auto; }
+
+.vdone { text-align: center; padding-block: 28px; }
+.vdone .big { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 0; }
+
+#toast {
+  position: fixed; inset-block-end: calc(18px + env(safe-area-inset-bottom, 0px));
+  inset-inline-start: 50%; translate: -50% 0;
+  background: var(--ink); color: var(--paper);
+  padding: 9px 16px; border-radius: 999px; font-size: .86rem;
+  opacity: 0; pointer-events: none; transition: opacity .18s;
+  max-inline-size: calc(100vw - 32px);
+}
+#toast.on { opacity: .95; }
+
+@media (min-width: 700px) {
+  .side { grid-template-columns: 1fr 1fr; }
+  .vkey { flex-basis: 72px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">2026 9월 학평 영어</div>
+      <h1>해석 코치 18–38</h1>
+    </div>
+    <div class="header-actions">
+      <button id="btn-vocab" class="ghost tiny">단어장</button>
+      <button id="btn-stats" class="ghost tiny">정리</button>
+      <button id="btn-repdf" class="ghost tiny">자료</button>
+    </div>
+  </header>
+
+  <section id="setup" hidden>
+    <div class="card">
+      <h3>시험지를 올려라</h3>
+      <p class="small muted">
+        문항이 미리 들어가 있으면 이 화면은 안 뜬다. 지금 보인다는 건 못 받아왔다는 뜻이니
+        <b>문제지</b>와 <b>해설지</b> PDF 두 개를 골라라. 순서는 상관없고, 내용을 보고 알아서 가린다.
+      </p>
+      <p class="small muted">
+        PDF는 <b>네 브라우저 안에서만</b> 읽는다. 지문은 어디로도 올라가지 않는다 —
+        채점할 때 그 문항 하나만 Claude에게 간다.
+      </p>
+      <input type="file" id="pdf-input" accept="application/pdf" multiple
+             style="inline-size:100%;margin-block:10px">
+      <p id="setup-status" class="small muted" role="status"></p>
+      <p id="setup-error" class="small" style="color:var(--wrong)" hidden></p>
+    </div>
+    <div class="card" id="setup-review" hidden>
+      <h3>이렇게 읽혔다</h3>
+      <p class="small muted">시험지랑 대조해서 이상한 게 없는지 한 번 훑어봐라.</p>
+      <div style="overflow-x:auto"><div id="setup-table"></div></div>
+      <div id="setup-warnings"></div>
+      <div class="row" style="margin-block-start:14px">
+        <button id="setup-confirm" class="primary">이대로 시작</button>
+        <button id="setup-redo" class="ghost">다시 고르기</button>
+      </div>
+    </div>
+  </section>
+
+  <main id="main" hidden>
+    <nav id="board" aria-label="문항 진행판"></nav>
+    <div class="legend">
+      <i><span class="dot" style="background:var(--right)"></span>맞음</i>
+      <i><span class="dot" style="background:var(--partial)"></span>부분맞음</i>
+      <i><span class="dot" style="background:var(--wrong)"></span>틀림</i>
+      <i id="sync-note" class="muted"></i>
+    </div>
+
+    <section id="workspace" hidden>
+      <div class="qhead">
+        <h2 id="q-title"></h2>
+        <button id="btn-source" class="ghost tiny">원문 보기</button>
+      </div>
+      <div id="q-source" class="source" hidden></div>
+
+      <label for="translation">내 해석</label>
+      <textarea id="translation" rows="7"
+        placeholder="지문을 한국어로 해석해서 여기 써라. 한 문장만 써도 된다 — 쓴 데까지만 채점한다. 원문은 가려져 있다."></textarea>
+
+      <div class="answer-row">
+        <span class="small muted">내 답</span>
+        <div id="answer-choices" class="row"></div>
+      </div>
+
+      <div class="row" style="margin-block-start:14px">
+        <button id="btn-grade" class="primary">채점</button>
+        <button id="btn-word" class="ghost">단어</button>
+        <button id="btn-whole" class="ghost">통째로</button>
+      </div>
+
+      <div id="verdict"></div>
+      <div id="panel"></div>
+    </section>
+
+    <section id="empty">
+      <div class="card">
+        <h3>어떻게 쓰나</h3>
+        <p class="small muted">
+          위에서 문항을 고르고, 지문을 한국어로 해석해서 쓴 다음 <b>채점</b>을 눌러라.
+          원문은 일부러 가려져 있다 — 해석 연습이니까. 막히면 <b>원문 보기</b>로 열면 된다.
+        </p>
+        <p class="small muted">
+          채점은 문제지·해설지 원문을 근거로만 한다. 맞은 부분은 말하지 않고 틀린 지점만 짚고,
+          다음에 할 행동 하나를 준다. <b>단어</b>·<b>통째로</b>·<b>정리</b>는 해설지에 있는 내용이라
+          바로 나온다.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <section id="vocab-view" hidden>
+    <div class="vtools">
+      <button id="btn-vocab-back" class="ghost tiny" aria-label="문항으로 돌아가기">←</button>
+      <select id="vocab-range" aria-label="범위"></select>
+      <div class="vtabs" role="tablist">
+        <button id="vtab-card" class="vtab on" role="tab">카드</button>
+        <button id="vtab-test" class="vtab" role="tab">테스트</button>
+        <button id="vtab-list" class="vtab" role="tab">목록</button>
+      </div>
+    </div>
+    <div id="vocab-stage"></div>
+  </section>
+
+  <section id="stats-view" hidden>
+    <div class="row" style="margin-block:14px">
+      <button id="btn-stats-back" class="ghost tiny">← 문항으로</button>
+    </div>
+    <div id="stats-body"></div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script type="module" src="app.js"></script>

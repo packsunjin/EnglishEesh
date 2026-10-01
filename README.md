@@ -72,6 +72,23 @@ PORT=3000
 
 ## 배포 (폰에서 쓰기)
 
+### 지금 쓰는 것: claude.ai 아티팩트
+
+실제로 쓰는 판은 claude.ai 아티팩트다. 서버도 API 키도 없다 — 채점은 보는 사람의 Claude
+계정으로 하고(`sample`), 문항과 기록은 아티팩트의 개인 저장소(`db`)에 있어서 폰과 PC가 같이 본다.
+단어장(카드 · 테스트 · 목록)도 여기 있다.
+
+소스는 `artifact/`에 아티팩트 전용 파일만 있고, 공통 로직은 `public/`의 것을 그대로 쓴다.
+
+```bash
+node scripts/build-artifact.mjs    # → dist/artifact/ 에 올릴 파일 11개가 조립된다
+```
+
+`dist/artifact/index.html`을 페이지로, 나머지를 같은 경로의 부속 파일로 올리면 된다.
+시험 지문은 이 묶음에 들어가지 않는다.
+
+### 직접 띄우기: Render
+
 **Render 무료 웹서비스**를 권한다. 평범한 Express 앱이라 로컬과 똑같이 돈다.
 
 1. Render에서 New → Web Service, 이 레포 연결

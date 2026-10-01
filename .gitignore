@@ -11,3 +11,6 @@ data/
 node_modules/
 npm-debug.log*
 .DS_Store
+
+# 아티팩트 조립 산물
+dist/
