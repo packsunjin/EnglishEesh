@@ -87,6 +87,19 @@ node scripts/build-artifact.mjs    # → dist/artifact/ 에 올릴 파일 11개�
 `dist/artifact/index.html`을 페이지로, 나머지를 같은 경로의 부속 파일로 올리면 된다.
 시험 지문은 이 묶음에 들어가지 않는다.
 
+### 웹사이트: GitHub Pages
+
+`docs/`가 그대로 웹사이트다 → **https://packsunjin.github.io/EnglishEesh/**
+
+처음 한 번만 켜야 한다: GitHub 레포 → **Settings → Pages** → Source **Deploy from a branch** →
+Branch `claude/korean-mock-exam-18-40-rs9nso`, 폴더 **/docs** → **Save**. 1~2분 뒤 위 주소가 열린다.
+
+Claude 밖이라 아티팩트판과 두 가지가 다르다.
+- **채점**: 버튼이 "프롬프트 복사"가 된다 → Claude 앱에 붙여넣기 → 돌아온 5줄을 도로 붙여넣기.
+- **문항**: 처음 한 번 문제지·해설지 PDF를 올린다(기기에만 저장). 단어장은 안 올려도 바로 된다.
+
+코드를 고쳤으면 `node scripts/build-artifact.mjs`로 `docs/`를 다시 만들고 커밋한다.
+
 ### 직접 띄우기: Render
 
 **Render 무료 웹서비스**를 권한다. 평범한 Express 앱이라 로컬과 똑같이 돈다.
