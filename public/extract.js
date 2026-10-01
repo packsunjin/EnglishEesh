@@ -6,7 +6,7 @@
 import { WIDE } from './pdftext.js';
 
 export const FIRST = 18;
-export const LAST = 40;
+export const LAST = 38;
 
 const CIRCLED = '①②③④⑤';
 const reSharedInstruction = /^\[(\d{1,2})\s*[~∼-]\s*(\d{1,2})\]\s*(.*)$/;

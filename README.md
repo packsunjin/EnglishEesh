@@ -1,6 +1,6 @@
 # 영어 해석 코치
 
-2026년 9월 고1 학력평가 영어 **18~40번**을 위한 해석 연습 도구.
+2026년 9월 고1 학력평가 영어 **18~38번**을 위한 해석 연습 도구.
 
 지문을 한국어로 해석해서 넣으면 채점받고, 틀린 이유가 다섯 갈래(어휘·구문·논리·지시어·범위)로
 자동으로 쌓여서 약점이 보인다. 폰에서 쓰라고 만들었다.
@@ -90,7 +90,7 @@ PORT=3000
 
 ```bash
 npm test                                                    # 36개. API 키 없이 돈다
-npm run check-bank data/eng_1_mun.pdf data/eng_1_hsj.pdf    # 18~40 전수 점검
+npm run check-bank data/eng_1_mun.pdf data/eng_1_hsj.pdf    # 18~38 전수 점검
 npm run check-bank data/eng_1_mun.pdf data/eng_1_hsj.pdf -- --dump 31   # 31번이 어떻게 읽혔는지
 npm run smoke data/eng_1_mun.pdf data/eng_1_hsj.pdf 31      # 실제 API 호출 2번. 돈이 나간다
 ```
